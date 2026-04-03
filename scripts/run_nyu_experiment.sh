@@ -7,20 +7,25 @@ OUT_DIR="${OUT_DIR:-/opt/runner/out}"
 
 RUNNER="${RUNNER:-dcipher}"              # baseline|dcipher|single_executor
 SPLIT="${SPLIT:-test}"                    # development|test
-TRIALS="${TRIALS:-1}"                     # default intentionally 1 for research iteration
+TRIALS="${TRIALS:-1}"
 CHALLENGE="${CHALLENGE:-}"                # optional single challenge
 MAX_CHALLENGES="${MAX_CHALLENGES:-0}"     # 0 = no cap
 EXPERIMENT_NAME="${EXPERIMENT_NAME:-iter_eval}"
 KEYS_FILE="${KEYS_FILE:-/opt/runner/keys.cfg}"
+NYUCTF_AGENTS_REF="${NYUCTF_AGENTS_REF:-unknown}"
+NYU_CTF_BENCH_REF="${NYU_CTF_BENCH_REF:-unknown}"
 
 mkdir -p "$OUT_DIR"
 cd "$ROOT_DIR"
 source "$VENV_PATH/bin/activate"
 
+TMP_CHALLENGE_LIST="$(mktemp)"
+trap 'rm -f "$TMP_CHALLENGE_LIST"' EXIT
+
 if [[ -n "$CHALLENGE" ]]; then
-  printf '%s\n' "$CHALLENGE" > "$OUT_DIR/challenge_list.txt"
+  printf '%s\n' "$CHALLENGE" > "$TMP_CHALLENGE_LIST"
 else
-  python3 - <<'PY' > "$OUT_DIR/challenge_list.txt"
+  python3 - <<'PY' > "$TMP_CHALLENGE_LIST"
 from nyuctf.dataset import CTFDataset
 import os
 split = os.environ.get("SPLIT", "test")
@@ -31,15 +36,27 @@ PY
 fi
 
 if [[ "$MAX_CHALLENGES" =~ ^[0-9]+$ ]] && [[ "$MAX_CHALLENGES" -gt 0 ]]; then
-  head -n "$MAX_CHALLENGES" "$OUT_DIR/challenge_list.txt" > "$OUT_DIR/challenge_list.limited.txt"
-  mv "$OUT_DIR/challenge_list.limited.txt" "$OUT_DIR/challenge_list.txt"
+  head -n "$MAX_CHALLENGES" "$TMP_CHALLENGE_LIST" > "${TMP_CHALLENGE_LIST}.limited"
+  mv "${TMP_CHALLENGE_LIST}.limited" "$TMP_CHALLENGE_LIST"
 fi
 
 if [[ "$RUNNER" == "dcipher" || "$RUNNER" == "single_executor" ]]; then
   [[ -f "$KEYS_FILE" ]] || { echo "missing keys file: $KEYS_FILE"; exit 2; }
 fi
 
-echo "runner=$RUNNER split=$SPLIT trials=$TRIALS" > "$OUT_DIR/experiment_plan.txt"
+{
+  echo "runner=$RUNNER"
+  echo "split=$SPLIT"
+  echo "trials=$TRIALS"
+  echo "experiment_name=$EXPERIMENT_NAME"
+  echo "nyuctf_agents_ref=$NYUCTF_AGENTS_REF"
+  echo "nyu_ctf_bench_ref=$NYU_CTF_BENCH_REF"
+  echo "max_challenges=$MAX_CHALLENGES"
+  echo "challenge_override=${CHALLENGE:-<none>}"
+  echo ""
+  echo "challenges:"
+  sed 's/^/- /' "$TMP_CHALLENGE_LIST"
+} > "$OUT_DIR/experiment_plan.txt"
 
 run_one() {
   local chal="$1"
@@ -79,25 +96,13 @@ run_one() {
   esac
 }
 
-TOTAL=$(wc -l < "$OUT_DIR/challenge_list.txt" | xargs)
+TOTAL=$(wc -l < "$TMP_CHALLENGE_LIST" | xargs)
 i=0
 while IFS= read -r chal; do
   [[ -z "$chal" ]] && continue
   i=$((i+1))
   for trial in $(seq 1 "$TRIALS"); do
     echo "[challenge $i/$TOTAL][trial $trial/$TRIALS] $chal"
-    if run_one "$chal" "$trial"; then
-      echo "$chal,trial=$trial,status=ok" >> "$OUT_DIR/experiment_runs.csv"
-    else
-      echo "$chal,trial=$trial,status=fail" >> "$OUT_DIR/experiment_runs.csv"
-    fi
+    run_one "$chal" "$trial"
   done
-done < "$OUT_DIR/challenge_list.txt"
-
-# Export detailed upstream runner logs into OUT_DIR so workflow S3 sync picks them up
-for d in logs_dcipher logs_single_executor logs_baseline; do
-  if [[ -d "$ROOT_DIR/$d" ]]; then
-    mkdir -p "$OUT_DIR/$d"
-    cp -a "$ROOT_DIR/$d/." "$OUT_DIR/$d/"
-  fi
-done
+done < "$TMP_CHALLENGE_LIST"
