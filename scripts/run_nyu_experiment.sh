@@ -93,3 +93,11 @@ while IFS= read -r chal; do
     fi
   done
 done < "$OUT_DIR/challenge_list.txt"
+
+# Export detailed upstream runner logs into OUT_DIR so workflow S3 sync picks them up
+for d in logs_dcipher logs_single_executor logs_baseline; do
+  if [[ -d "$ROOT_DIR/$d" ]]; then
+    mkdir -p "$OUT_DIR/$d"
+    cp -a "$ROOT_DIR/$d/." "$OUT_DIR/$d/"
+  fi
+done
