@@ -8,10 +8,18 @@ class APIKeys(dict):
     """Loads and holds API keys"""
     def __init__(self, key_cfg):
         keys = Path(key_cfg).open("r")
-        for line in keys:
-            if line.startswith("#"):
+        for raw in keys:
+            line = raw.strip()
+            if not line or line.startswith("#"):
                 continue
-            tag, k = line.strip().split("=")
+            if "=" not in line:
+                # tolerate malformed/non key-value lines in keys.cfg
+                continue
+            tag, k = line.split("=", 1)
+            tag = tag.strip()
+            k = k.strip()
+            if not tag or not k:
+                continue
             self[tag] = k
 
 def load_common_options(parser):
