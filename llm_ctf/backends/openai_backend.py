@@ -50,6 +50,8 @@ class OpenAIBackend(Backend):
                 api_key = open(os.path.expanduser(API_KEY_PATH), "r").read().strip()
             else:
                 raise ValueError(f"No OpenAI API key provided and none found in OPENAI_API_KEY or {API_KEY_PATH}")
+        else:
+            api_key = args.api_key
         self.client = OpenAI(api_key=api_key)
         self.tools = tools
         self.tool_schemas = [ChatCompletionToolParam(**tool.schema) for tool in tools.values()]

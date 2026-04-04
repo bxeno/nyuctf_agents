@@ -19,6 +19,8 @@ class ChallengeList:
             with open(challist, 'r', newline='') as file:
                 tsv_reader = csv.reader(file, delimiter='\t')
                 for row in tsv_reader:
+                    if row[:4] == ["Year", "Event", "Category", "Challenge"]:
+                        continue
                     self.chal_info.append(row)
                     self.chal_names.append(row[3]) 
             

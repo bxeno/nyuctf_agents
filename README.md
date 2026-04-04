@@ -25,5 +25,7 @@ Setup docker container with setup.sh.  <br>
 
 **Step 4**
 
-Finish the whole setup using the do_eval.sh file. You can do this using the following command:  <br>
-```bash do_eval.sh```  <br>
+For paper-version runs, use the repository-local `do_paper_eval.sh` runner instead of the original `do_eval.sh` loop. It auto-detects either the original `challenge_list.tsv` layout or the newer `test_dataset.json` layout from a sibling `LLM_CTF_Database` or `NYU_CTF_Bench` checkout.  <br>
+```bash ./do_paper_eval.sh```  <br>
+For a short validation run:  <br>
+```bash python3 scripts/run_paper_eval.py --limit 1 --repeats 1 --debug```  <br>

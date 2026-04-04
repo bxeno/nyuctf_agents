@@ -438,6 +438,8 @@ class AnthropicBackend(VLLMBackend):
                 api_key = open(os.path.expanduser(self.API_KEY_PATH), "r").read().strip()
             else:
                 raise ValueError(f"No Anthropic API key provided and none found in ANTHROPIC_API_KEY or {self.API_KEY_PATH}")
+        else:
+            api_key = args.api_key
         os.environ["ANTHROPIC_API_KEY"] = api_key
         self.client = Anthropic(api_key=api_key)
 
