@@ -235,10 +235,29 @@ class CTFChallenge:
 
         if self.is_compose:
             status.debug_message(f"Starting challenge services with docker-compose")
-            subprocess.run(
-                ['docker', 'compose', '-f', self.chaldir / 'docker-compose.yml', 'up', '-d', '--force-recreate'],
-                check=True, capture_output=True,
-            )
+            compose_file = self.chaldir / 'docker-compose.yml'
+            up_cmd = ['docker', 'compose', '-f', compose_file, 'up', '-d', '--force-recreate']
+            try:
+                subprocess.run(up_cmd, check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                # Improve diagnosability and attempt one pull+retry for missing images/transient pull failures.
+                stderr = (e.stderr or '').strip()
+                stdout = (e.stdout or '').strip()
+                status.debug_message(f"docker compose up failed (rc={e.returncode})", truncate=False)
+                if stdout:
+                    status.debug_message(f"docker compose stdout:\n{stdout}", truncate=False)
+                if stderr:
+                    status.debug_message(f"docker compose stderr:\n{stderr}", truncate=False)
+
+                pull_cmd = ['docker', 'compose', '-f', compose_file, 'pull']
+                pull = subprocess.run(pull_cmd, check=False, capture_output=True, text=True)
+                if pull.stdout:
+                    status.debug_message(f"docker compose pull stdout:\n{pull.stdout}", truncate=False)
+                if pull.stderr:
+                    status.debug_message(f"docker compose pull stderr:\n{pull.stderr}", truncate=False)
+
+                # Retry once after pull attempt.
+                subprocess.run(up_cmd, check=True, capture_output=True, text=True)
             return
 
         # If it's not a compose challenge and it has no container, assume it's a non-server challenge
