@@ -63,9 +63,8 @@ RUN pip install -U pip
 RUN pip install pwntools gmpy2 angr chepy
 RUN mkdir ctf_files
 RUN curl https://raw.githubusercontent.com/c3-ctf/ctftools/master/install.sh | sh
-# project_ares currently requires newer Cargo features than Ubuntu 22.04 apt rust/cargo.
-# Do not fail image build if this optional tool cannot be installed.
-RUN cargo install project_ares || (echo "WARN: project_ares install skipped (cargo toolchain too old on base image)" && true)
+# Pin to period-appropriate release for paper-era reproduction and stable dependency resolution.
+RUN cargo install project_ares --version 0.10.0 --locked
 
 # Copy in the entrypoint script
 COPY entrypoint.sh /home/$USERNAME/.entrypoint.sh
